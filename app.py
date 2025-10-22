@@ -143,15 +143,21 @@ def sniff_is_image(path):
 
 def download_one(url: str, suggested_name: str):
     try:
-        r = requests.get(url, timeout=30)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/129.0 Safari/537.36"
+        }
+        r = requests.get(url, headers=headers, timeout=45, allow_redirects=True)
         if r.status_code != 200:
             return None, f"http_status_{r.status_code}"
+
         fname = None
         cd = r.headers.get('Content-Disposition')
         if cd and 'filename=' in cd:
-            fname = cd.split('filename=')[-1].strip('"')
+            fname = cd.split('filename=')[-1].strip('"; ')
         if not fname:
             fname = sanitize_filename(suggested_name)
+
         path = os.path.join(ATT_DIR, fname)
         with open(path, 'wb') as f:
             f.write(r.content)
