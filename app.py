@@ -3,7 +3,7 @@
 Validador de Comprovantes (Pipefy – 1 arquivo) • Visual Ágora
 """
 
-import os, re, io, imghdr, requests
+import os, re, io, requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -135,7 +135,9 @@ def extract_text_from_image(path):
 
 def sniff_is_image(path):
     try:
-        return imghdr.what(path) in {"jpeg","png","gif","bmp","tiff"}
+        with Image.open(path) as img:
+            img.verify()  # valida assinatura sem carregar o arquivo todo
+            return (img.format or "").upper() in {"JPEG","JPG","PNG","GIF","BMP","TIFF","WEBP"}
     except Exception:
         return False
 
