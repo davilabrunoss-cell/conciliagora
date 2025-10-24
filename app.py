@@ -25,42 +25,63 @@ st.set_page_config(page_title="CONCILIÁGORA – Validador", page_icon="🧾", l
 
 st.markdown("""
 <style>
-:root {
-  --teal:#23b7a2;        /* botões / boxes */
+:root{
+  --teal:#23b7a2;
   --teal-dark:#159686;
-  --bg1:#0a2f33;         /* topo gradiente */
-  --bg2:#0b1c20;         /* base gradiente */
-  --panel:#0e2428;       /* painel esquerdo */
+  --bg1:#0a2f33;
+  --bg2:#0b1c20;
   --text:#e6f6f4;
   --muted:#a6c5c1;
 }
-.block-container {padding-top: 1.5rem; padding-bottom: 1rem; max-width: 1220px;}
-body {color: var(--text) !important;}
-[data-testid="stAppViewContainer"] > .main {background: linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);}
-.sidebar, [data-testid="stSidebar"] {background: var(--panel);}
-h1,h2,h3,h4,h5,h6 {color: var(--text) !important;}
-.small {color: var(--muted); font-size: 0.9rem}
-.hero {font-size: 44px; font-weight: 800; letter-spacing: 1px; margin-bottom: .25rem;}
-.hero .accent {color: var(--teal);}
-.panel {
-  background: var(--panel); border-radius: 16px; padding: 18px; border: 1px solid rgba(255,255,255,0.05);
+
+.block-container{
+  padding-top:2.5rem;
+  padding-bottom:1rem;
+  max-width:1220px;
 }
-.upload-box {
-  background: #2dd4bf22; border: 2px dashed #2dd4bf66; padding: 18px; border-radius: 14px;
+
+body{ color:var(--text) !important; }
+[data-testid="stAppViewContainer"] > .main{
+  background:linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
 }
-.stFileUploader > section > div {padding: 0 !important;}
-.stFileUploader label {font-weight: 600; color: var(--text);}
-.stButton>button {
-  background: var(--teal); color: #062522; border: 0; padding: 10px 18px;
-  font-weight: 700; border-radius: 12px;
+
+h1,h2,h3,h4,h5,h6{ color:var(--text) !important; }
+.small{ color:var(--muted); font-size:0.9rem; }
+.hero{ font-size:44px; font-weight:800; letter-spacing:1px; margin-bottom:.25rem; }
+.hero .accent{ color:var(--teal); }
+
+/* remove só a “barrinha fantasma” do topo */
+div[data-testid="stDecoration"]{ display:none !important; }
+
+/* Uploader (mantém o retângulo com tracejado) */
+[data-testid="stFileUploader"] > section{
+  background:#2dd4bf22;
+  border:2px dashed #2dd4bf66;
+  border-radius:14px;
+  padding:16px;
 }
-.stButton>button:hover {background: var(--teal-dark);}
-[data-testid="stMetricValue"] {font-weight: 800;}
-.badge {display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; margin-left:8px;}
-.badge.ok {background:#065f46; color:#ecfdf5;}
-.badge.warn {background:#7c2d12; color:#ffedd5;}
-.badge.na {background:#334155; color:#e2e8f0;}
-table td, table th {white-space: nowrap;}
+.stFileUploader > section > div{ padding:0 !important; }
+.stFileUploader label{ font-weight:600; color:var(--text); }
+
+/* Botão primário */
+.stButton>button{
+  background:var(--teal);
+  color:#062522;
+  border:0;
+  padding:10px 18px;
+  font-weight:700;
+  border-radius:12px;
+}
+.stButton>button:hover{ background:var(--teal-dark); }
+
+/* Métricas e badges */
+[data-testid="stMetricValue"]{ font-weight:800; }
+.badge{ display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; margin-left:8px; }
+.badge.ok{ background:#065f46; color:#ecfdf5; }
+.badge.warn{ background:#7c2d12; color:#ffedd5; }
+.badge.na{ background:#334155; color:#e2e8f0; }
+
+table td, table th{ white-space:nowrap; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -84,6 +105,7 @@ def read_table(uploaded):
     raise ValueError("Não consegui ler o arquivo. Exporte como XLSX/CSV simples.")
 
 def sanitize_filename(name: str) -> str:
+    # mantém letras, números, ponto e hífen (evita espaços/acentos no disco)
     base = re.sub(r"[^a-zA-Z0-9.-]+", "", name)[:120]
     return base or "arquivo"
 
@@ -136,7 +158,7 @@ def extract_text_from_image(path):
 def sniff_is_image(path):
     try:
         with Image.open(path) as img:
-            img.verify()  # valida assinatura sem carregar o arquivo todo
+            img.verify()
             return (img.format or "").upper() in {"JPEG","JPG","PNG","GIF","BMP","TIFF","WEBP"}
     except Exception:
         return False
@@ -174,6 +196,12 @@ def to_float_br(x):
     try: return float(s)
     except Exception: return None
 
+def is_yes(x) -> bool:
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return False
+    s = str(x).strip().lower()
+    return s in {"sim", "sí", "yes", "y", "true", "1"}
+
 def sanitize_for_excel_df(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     for col in out.columns:
@@ -197,31 +225,42 @@ if not OCR_OK:
 left, right = st.columns([0.36, 0.64], gap="large")
 
 with left:
-    st.markdown("<div class='panel'>", unsafe_allow_html=True)
-    # Logo + título painel
+    st.markdown('<div class="sheet">', unsafe_allow_html=True)
+
     if os.path.exists("agora_logo.png"):
         st.image("agora_logo.png", width=120)
+
     st.markdown("### Mapeamento de colunas")
     col_codigo     = st.text_input("Coluna do Código (opcional)", "Código")
     col_valor_pago = st.text_input("Coluna do Valor pago", "Valor pago")
     col_url        = st.text_input("Coluna do comprovante", "Comprovante de pagamento")
+    col_agrupado   = st.text_input("Coluna de 'Agrupado' (Sim/vazio)", "Agrupado")  # <- NOVO
 
     st.markdown("### Parâmetros")
     tol_centavos = st.number_input("Tolerância de valor (R$)", value=0.02, min_value=0.00, step=0.01, format="%.2f")
     max_workers  = st.slider("Download simultâneos", 1, 10, 6)
-    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with right:
-    # Hero
-    st.markdown(
-        "<div class='hero'>CONCILI<span class='accent'>ÁGORA</span></div>"
-        "<div class='small'>Validador de Comprovantes</div>",
-        unsafe_allow_html=True
-    )
+    # ---- Cabeçalho / Logo ----
+    logo_candidates = ["conciliagora_logo.png", "logo_conciliagora.png", "ConciliAGORA.png"]
+    logo_path = next((p for p in logo_candidates if os.path.exists(p)), None)
 
-    st.markdown("*📄 Envie a planilha do Pipefy (XLSX/CSV)*")
+    if logo_path:
+        st.image(logo_path, width=220)
+    else:
+        st.markdown(
+            "<div class='hero'>CONCILI<span class='accent'>ÁGORA</span></div>",
+            unsafe_allow_html=True
+        )
+
+    st.markdown("#### Validador de Comprovantes")
+    st.markdown("📄 Envie a planilha do Pipefy (XLSX/CSV)")
+
+    # ---- Upload box ----
     st.markdown("<div class='upload-box'>", unsafe_allow_html=True)
-    up = st.file_uploader(" ", type=["xlsx","xls","csv"], label_visibility="collapsed", key="pipefy")
+    up = st.file_uploader(" ", type=["xlsx", "xls", "csv"], label_visibility="collapsed", key="pipefy")
     st.markdown("</div>", unsafe_allow_html=True)
 
     run = st.button("Validar comprovantes")
@@ -234,15 +273,16 @@ if run:
 
     df = read_table(up)
 
-    # checagem de colunas
+    # checagem de colunas mínimas
     for col, label in [(col_valor_pago, "Valor pago"), (col_url, "URL do comprovante")]:
         if col not in df.columns:
-            st.error(f"Não encontrei a coluna *{label}* ('{col}') na planilha. Ajuste no painel esquerdo.")
+            st.error(f"Não encontrei a coluna {label} ('{col}') na planilha. Ajuste no painel esquerdo.")
             st.stop()
 
-    valores = df[col_valor_pago].apply(to_float_br)
-    urls    = df[col_url].astype(str).fillna("").tolist()
-    codigos = df[col_codigo] if col_codigo in df.columns else pd.Series([None]*len(df))
+    valores   = df[col_valor_pago].apply(to_float_br)
+    urls      = df[col_url].astype(str).fillna("").tolist()
+    codigos   = df[col_codigo]   if col_codigo   in df.columns else pd.Series([None]*len(df))
+    agrupados = df[col_agrupado] if col_agrupado in df.columns else pd.Series([""]*len(df))  # NOVO
 
     st.info("Baixando comprovantes…")
     paths, statuses = [None]*len(urls), [""]*len(urls)
@@ -261,10 +301,22 @@ if run:
 
     contains, notes = [], []
     found_amounts, found_raws, diffs, snippets = [], [], [], []
+    agr_flags = []  # NOVO
 
     for i in range(len(df)):
-        amount = valores.iloc[i]; url = urls[i]; p = paths[i]; status = statuses[i]
-        ok = None; note = ""; found_amt = None; found_raw = None; diff_val = None; snippet = ""
+        amount = valores.iloc[i]
+        url    = urls[i]
+        p      = paths[i]
+        status = statuses[i]
+        agr_flag = is_yes(agrupados.iloc[i])  # interpreta "Sim" etc. como True
+
+        ok = None
+        note = ""
+        found_amt = None
+        found_raw = None
+        diff_val = None
+        snippet = ""
+
         if not url or not isinstance(url, str) or not url.startswith("http"):
             ok = None; note = "sem_URL"
         elif status != "ok" or not p or not os.path.exists(p):
@@ -274,7 +326,8 @@ if run:
                 if p.lower().endswith(".pdf") and pdfplumber:
                     txt = extract_text_from_pdf(p)
                     found_amt, diff_val, snippet, found_raw = pick_best_amount(txt, amount, tol=tol_centavos)
-                    if txt.strip() == "": note = "pdf_sem_texto"
+                    if txt.strip() == "":
+                        note = (note + "; " if note else "") + "pdf_sem_texto"
                     ok = (found_amt is not None and abs(diff_val) <= tol_centavos)
                 elif sniff_is_image(p):
                     if OCR_OK:
@@ -288,12 +341,21 @@ if run:
             except Exception:
                 ok = None; note = "erro_processamento"
 
-        contains.append(ok); notes.append(note)
-        found_amounts.append(found_amt); found_raws.append(found_raw)
-        diffs.append(diff_val); snippets.append(snippet)
+        # Se deu divergência mas é um pagamento agrupado, anote isso
+        if ok is False and agr_flag:
+            note = (note + "; " if note else "") + "agrupado"
+
+        contains.append(ok)
+        notes.append(note)
+        found_amounts.append(found_amt)
+        found_raws.append(found_raw)
+        diffs.append(diff_val)
+        snippets.append(snippet)
+        agr_flags.append(agr_flag)
 
     out = pd.DataFrame({
         "Código": codigos,
+        "Agrupado?": agr_flags,   # NOVO
         "Valor pago": df[col_valor_pago],
         "Valor pago (num)": valores,
         "URL comprovante": urls,
@@ -320,7 +382,7 @@ if run:
     status_badge = ('<span class="badge ok">OK</span>' if no_qtd==0 and na_qtd==0
                     else '<span class="badge warn">atenção</span>' if no_qtd>0
                     else '<span class="badge na">parcial</span>')
-    st.markdown(f"*Status:* {status_badge}", unsafe_allow_html=True)
+    st.markdown(f"Status: {status_badge}", unsafe_allow_html=True)
 
     # ======== Abas ========
     tab1, tab2, tab3 = st.tabs(["📋 Auditoria completa", "⚠️ Divergências", "🚧 Não processados / 404"])
@@ -329,26 +391,56 @@ if run:
         st.dataframe(out, use_container_width=True, height=460)
 
     with tab2:
-        diverg = out[out["Comprovante contém o valor?"] == False][
-            ["Código","Valor pago","Valor encontrado no comprovante (num)","Diferença (encontrado - pago)"]
-        ].copy()
-        diverg = diverg.sort_values(by="Diferença (encontrado - pago)", key=lambda s: s.abs(), ascending=False)
+        # Trabalhe numa cópia pra não mexer no 'out' original
+        o2 = out.copy()
+
+        # Garante que a coluna exista
+        if "Agrupado?" not in o2.columns:
+            o2["Agrupado?"] = False
+
+        desired_cols = [
+            "Código",
+            "Agrupado?",
+            "Valor pago",
+            "Valor encontrado no comprovante (num)",
+            "Diferença (encontrado - pago)",
+            "Obs",
+        ]
+        keep = [c for c in desired_cols if c in o2.columns]
+
+        diverg = o2[o2["Comprovante contém o valor?"] == False][keep].copy()
+
+        if "Diferença (encontrado - pago)" in diverg.columns:
+            diverg = diverg.sort_values(
+                by="Diferença (encontrado - pago)",
+                key=lambda s: s.abs(),
+                ascending=False
+            )
+
         st.dataframe(diverg, use_container_width=True, height=400)
+
         if not diverg.empty:
-            st.download_button("⬇️ Baixar divergências (CSV)",
-                               data=diverg.to_csv(index=False).encode("utf-8"),
-                               file_name="divergencias.csv",
-                               mime="text/csv")
+            st.download_button(
+                "⬇️ Baixar divergências (CSV)",
+                data=diverg.to_csv(index=False).encode("utf-8"),
+                file_name="divergencias.csv",
+                mime="text/csv"
+            )
 
     with tab3:
-        na = out[out["Comprovante contém o valor?"].isna()][["Código","Valor pago","URL comprovante","Status download","Obs"]]
+        na_cols = ["Código","Valor pago","URL comprovante","Status download","Obs"]
+        na_cols = [c for c in na_cols if c in out.columns]
+        na = out[out["Comprovante contém o valor?"].isna()][na_cols]
         st.dataframe(na, use_container_width=True, height=400)
-        only404 = na[na["Status download"]=="http_status_404"]
-        if not only404.empty:
-            st.download_button("⬇️ Baixar apenas 404 (CSV)",
-                               data=only404.to_csv(index=False).encode("utf-8"),
-                               file_name="links_404.csv",
-                               mime="text/csv")
+        if "Status download" in na.columns:
+            only404 = na[na["Status download"]=="http_status_404"]
+            if not only404.empty:
+                st.download_button(
+                    "⬇️ Baixar apenas 404 (CSV)",
+                    data=only404.to_csv(index=False).encode("utf-8"),
+                    file_name="links_404.csv",
+                    mime="text/csv"
+                )
 
     # ======== Exportar Excel (saneado) ========
     out_name = f"auditoria_comprovantes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -367,4 +459,4 @@ if run:
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 st.markdown("---")
-st.caption("Feito com ❤️ pela dupla Bruno & Luna • Modo: *apenas planilha do Pipefy (links dos comprovantes)*.")
+st.caption("Feito com ❤️ pela dupla Bruno & Luna • Modo: apenas planilha do Pipefy (links dos comprovantes).")
